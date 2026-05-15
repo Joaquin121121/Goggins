@@ -135,11 +135,13 @@ export function CharacterPortrait({
   size = 240,
   silhouette = false,
   animate = false,
+  imgSrc,
 }: {
   character: Character | null;
   size?: number | string;
   silhouette?: boolean;
   animate?: boolean;
+  imgSrc?: string;
 }) {
   if (!character) {
     return (
@@ -187,8 +189,9 @@ export function CharacterPortrait({
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={characterImg(character)}
+        src={imgSrc ?? characterImg(character)}
         alt={character.display_name}
+        crossOrigin="anonymous"
         style={{
           position: 'relative',
           zIndex: 1,

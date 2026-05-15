@@ -3,7 +3,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import type { Character, GogginsUser } from '@/lib/types';
 import { RARITY_META } from '@/lib/types';
-import { CharacterPortrait, RarityBadge, StatBar } from './primitives';
+import { CharacterPortrait, RarityBadge, StatBar, characterImg } from './primitives';
+
+async function fetchAsDataURL(url: string): Promise<string> {
+  const res = await fetch(url, { cache: 'force-cache' });
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
 
 type Props = {
   character: Character;
@@ -14,13 +25,41 @@ type Props = {
 export function ShareModal({ character, user, onClose }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [imgDataUrl, setImgDataUrl] = useState<string | null>(null);
 
   const message = `${user.name} es el Goggins del día — ${character.display_name}.`;
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchAsDataURL(characterImg(character))
+      .then(dataUrl => {
+        if (!cancelled) setImgDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setImgDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [character]);
+
   const generateBlob = async (): Promise<Blob | null> => {
     if (!cardRef.current) return null;
+    // Ensure every <img> inside the card is fully decoded before rasterising,
+    // otherwise html-to-image captures a blank placeholder on Safari/WebKit.
+    const imgs = Array.from(cardRef.current.querySelectorAll('img'));
+    await Promise.all(
+      imgs.map(img =>
+        img.complete && img.naturalWidth > 0
+          ? Promise.resolve()
+          : new Promise<void>(resolve => {
+              img.addEventListener('load', () => resolve(), { once: true });
+              img.addEventListener('error', () => resolve(), { once: true });
+            }),
+      ),
+    );
     const dataUrl = await toPng(cardRef.current, {
-      cacheBust: true,
+      cacheBust: false,
       pixelRatio: 2,
       backgroundColor: '#F5F1E8',
     });
@@ -118,12 +157,17 @@ export function ShareModal({ character, user, onClose }: Props) {
           gap: 12,
         }}
       >
-        <ShareCard ref={cardRef} character={character} user={user} />
+        <ShareCard
+          ref={cardRef}
+          character={character}
+          user={user}
+          imgSrc={imgDataUrl}
+        />
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={shareToWhatsApp}
-            disabled={busy}
+            disabled={busy || !imgDataUrl}
             style={{
               flex: 1,
               padding: '14px 16px',
@@ -149,7 +193,7 @@ export function ShareModal({ character, user, onClose }: Props) {
           </button>
           <button
             onClick={downloadImage}
-            disabled={busy}
+            disabled={busy || !imgDataUrl}
             title="Descargar imagen"
             style={{
               padding: '14px',
@@ -185,8 +229,8 @@ export function ShareModal({ character, user, onClose }: Props) {
 
 const ShareCard = React.forwardRef<
   HTMLDivElement,
-  { character: Character; user: GogginsUser }
->(function ShareCard({ character, user }, ref) {
+  { character: Character; user: GogginsUser; imgSrc?: string | null }
+>(function ShareCard({ character, user, imgSrc }, ref) {
   const r = RARITY_META[character.rarity];
   return (
     <div
@@ -226,7 +270,12 @@ const ShareCard = React.forwardRef<
       </div>
 
       <div style={{ height: 220, display: 'grid', placeItems: 'center', marginTop: 6 }}>
-        <CharacterPortrait character={character} size={220} animate={false} />
+        <CharacterPortrait
+          character={character}
+          size={220}
+          animate={false}
+          imgSrc={imgSrc ?? undefined}
+        />
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 4 }}>
