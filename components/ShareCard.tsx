@@ -3,7 +3,52 @@ import React, { useEffect, useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import type { Character, GogginsUser } from '@/lib/types';
 import { RARITY_META } from '@/lib/types';
-import { CharacterPortrait, RarityBadge, StatBar, characterImg } from './primitives';
+import { RarityBadge, StatBar, characterImg } from './primitives';
+
+function SharePortrait({
+  imgSrc,
+  accent,
+  size,
+}: {
+  imgSrc: string | null;
+  accent: string;
+  size: number;
+}) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: size,
+        height: size,
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '6%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '64%',
+          height: 10,
+          background: `radial-gradient(ellipse, ${accent}55 0%, transparent 70%)`,
+          filter: 'blur(2px)',
+        }}
+      />
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          height: '100%',
+          backgroundImage: imgSrc ? `url("${imgSrc}")` : 'none',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: 'contain',
+        }}
+      />
+    </div>
+  );
+}
 
 async function fetchAsDataURL(url: string): Promise<string> {
   const res = await fetch(url, { cache: 'force-cache' });
@@ -270,12 +315,7 @@ const ShareCard = React.forwardRef<
       </div>
 
       <div style={{ height: 220, display: 'grid', placeItems: 'center', marginTop: 6 }}>
-        <CharacterPortrait
-          character={character}
-          size={220}
-          animate={false}
-          imgSrc={imgSrc ?? undefined}
-        />
+        <SharePortrait imgSrc={imgSrc ?? null} accent={r.color} size={220} />
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 4 }}>
